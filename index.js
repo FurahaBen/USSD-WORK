@@ -1,51 +1,74 @@
 const express = require('express');
 const bodyParser = require('body-parser');
-
+const mysql = require('mysql');
 const app = express();
+
 app.use(bodyParser.urlencoded({ extended: false }));
 
+// MySQL Database Connection
+const db = mysql.createConnection({
+  host: 'localhost',
+  user: 'root',
+  password: '',
+  database: 'ussd_db'
+});
+
+db.connect(err => {
+  if (err) throw err;
+  console.log('Connected to MySQL Database');
+});
+
+// Main USSD Endpoint
 app.post('/', (req, res) => {
   const { sessionId, serviceCode, phoneNumber, text } = req.body;
+  const textValue = text.split('*');
 
+  let level = textValue.length;
   let response = '';
 
-  // Menu navigation logic
-  if (text === '') {
-    response = `CON Hitamo Telephone:
-1. iPhone 14
-2. Samsung Galaxy S22
-3. Tecno Spark 10
-4. Infinix Note 12`;
-  } else if (text === '1') {
-    response = `END iPhone 14 Features:
-- 6.1-inch Super Retina XDR display
-- A15 Bionic chip
-- Dual 12MP cameras
-- iOS 16
-- 5G support`;
-  } else if (text === '2') {
-    response = `END Samsung Galaxy S22 Features:
-- 6.1-inch Dynamic AMOLED display
-- Exynos 2200 / Snapdragon 8 Gen 1
-- Triple camera system
-- Android 13
-- 5G support`;
-  } else if (text === '3') {
-    response = `END Tecno Spark 10 Features:
-- 6.6-inch HD+ display
-- MediaTek Helio G37
-- 50MP AI Dual Camera
-- Android 12
-- 5000mAh Battery`;
-  } else if (text === '4') {
-    response = `END Infinix Note 12 Features:
-- 6.7-inch AMOLED display
-- MediaTek Helio G88
-- 50MP Triple Camera
-- Android 11
-- 5000mAh Battery`;
+  // Save or update session
+  const currentInput = db.escape(text);
+  const lang = textValue[0] === '1' ? 'EN' : (textValue[0] === '2' ? 'RW' : '');
+
+  if (level === 1 && text === '') {
+    response = `CON Welcome / Murakaza neza:
+1. English
+2. Kinyarwanda`;
+
+    db.query(
+      'REPLACE INTO sessions(sessionID, phoneNumber, userInput, language) VALUES (?, ?, ?, ?)',
+      [sessionId, phoneNumber, '', ''],
+    );
+  } else if (level === 1) {
+    db.query(
+      'UPDATE sessions SET language = ? WHERE sessionID = ?',
+      [lang, sessionId]
+    );
+    response = lang === 'EN' ? 
+      `CON Main Menu:\n1. View Phones\n2. My Transactions\n0. Back` :
+      `CON Menyu Nyamukuru:\n1. Reba Telefoni\n2. Amakuru Yanjye\n0. Subira Inyuma`;
+  } else if (level === 2 && textValue[1] === '1') {
+    response = lang === 'EN' ?
+      `CON Choose Phone:\n1. iPhone 14\n2. Samsung Galaxy S22\n3. Tecno Spark 10\n4. Infinix Note 12` :
+      `CON Hitamo Telephone:\n1. iPhone 14\n2. Samsung Galaxy S22\n3. Tecno Spark 10\n4. Infinix Note 12`;
+  } else if (level === 3) {
+    const phoneFeatures = {
+      '1': 'iPhone 14: 6.1” Display, A15 Bionic, iOS 16, 5G',
+      '2': 'Samsung S22: AMOLED, Snapdragon 8, Android 13, 5G',
+      '3': 'Tecno Spark 10: 6.6” Display, Helio G37, Android 12',
+      '4': 'Infinix Note 12: 6.7” AMOLED, Helio G88, 5000mAh'
+    };
+    const phone = phoneFeatures[textValue[2]] || 'Invalid choice';
+
+    // Save transaction
+    db.query(
+      'INSERT INTO transactions(phoneNumber, action) VALUES (?, ?)',
+      [phoneNumber, `Viewed ${phone}`]
+    );
+
+    response = `END ${phone}`;
   } else {
-    response = 'END Icyo wahisemo nticyumvikanye.';
+    response = 'END Invalid input or navigation.';
   }
 
   res.set('Content-Type', 'text/plain');
@@ -54,5 +77,5 @@ app.post('/', (req, res) => {
 
 const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
-  console.log(`USSD phone menu app running on port ${PORT}`);
+  console.log(`USSD app running on port ${PORT}`);
 });
