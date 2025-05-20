@@ -6,13 +6,13 @@ require('dotenv').config();
 const app = express();
 app.use(bodyParser.urlencoded({ extended: false }));
 
-// Connect to PostgreSQL using DATABASE_URL from .env or Render
+// PostgreSQL connection using environment variable
 const pool = new Pool({
   connectionString: process.env.DATABASE_URL,
   ssl: { rejectUnauthorized: false }
 });
 
-// Create tables
+// Create tables if not exist
 const createTables = async () => {
   await pool.query(`
     CREATE TABLE IF NOT EXISTS sessions (
@@ -35,6 +35,7 @@ const createTables = async () => {
 
 createTables().catch(console.error);
 
+// USSD Logic
 app.post('/', async (req, res) => {
   const { sessionId, serviceCode, phoneNumber, text } = req.body;
   const inputs = text.split('*');
