@@ -56,3 +56,19 @@ const PORT = process.env.PORT || 3000;
 app.listen(PORT, () => {
   console.log(`USSD phone menu app running on port ${PORT}`);
 });
+const { Pool } = require('pg');
+
+// Replace this with your actual Render connection string
+const pool = new Pool({
+  connectionString: 'postgres://username:password@hostname:port/databasename',
+  ssl: { rejectUnauthorized: false } // Required for Render SSL
+});
+
+// Test connection
+pool.query('SELECT NOW()', (err, res) => {
+  if (err) {
+    console.error('Connection error', err.stack);
+  } else {
+    console.log('Connected to PostgreSQL at:', res.rows[0].now);
+  }
+});
